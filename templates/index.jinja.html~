@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MAGFest Official Radio Checkout System</title>
+    <style type="text/css">
+      .error {
+        color: #ff0000;
+      }
+
+      .message {
+        color: #00ff00;
+      }
+
+      tr.checked-in {
+        background-color: #CAFFD8;
+      }
+
+      tr.checked-out {
+        background-color: #FFBBBB;
+      }
+
+      .headset-yes {
+        background: #003366;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1> Radio Checkout </h1>
+    <h2>Headsets Remaining: {{ headsets }}</h2>
+
+    {% if error %}
+    <h2 class="error">{{ error }}</h2>
+    {% elif msg %}
+    <h2 class="message">{{ msg }}</h2>
+    {% endif %}
+
+    <table>
+      <thead>
+	<tr>
+	  <th>ID</th>
+	  <th>Status</th>
+	  <th>Name / Badge</th>
+	  <th>Department</th>
+	  <th>Headset</th>
+	  <th>Check Out</th>
+	  <th>Check In</th>
+	</tr>
+      </thead>
+      <tbody>
+	{% for number, radio in radios %}
+	{% if radio['status'] == "CHECKED_IN" %}
+	<tr class="checked-in">
+	  <form action="/checkout" method="post">
+	    <td><a href="/radio/{{ number }}">{{ number }}</a></td>
+	    <td title="{{ radio['last_activity']|full_date }}">In {% if radio['last_activity'] %}{{ radio['last_activity']|rel_date }}{% endif %}</td>
+	    <td>
+	      <input name="name" type="text" placeholder="Name" required="true"/>
+	    </td>
+	    <td>
+	      <input name="department" type="department" placeholder="Department (optional)"/>
+	    </td>
+	    <td>
+	      <input name="headset" type="checkbox" value="1"/>
+	    </td>
+	    <td>
+	      <form action="/checkout" method="post">
+		<input type="hidden" name="id" value="{{ number }}"/>
+		<input type="submit" name="action" value="Check Out" class="btn-check-out"/>
+	    </td>
+	    <td/>
+	    </form>
+	</tr>
+	{% else %}
+	{% set headset = radio['checkout'].get('headset', False) %}
+	<tr class="checked-out">
+	  <td><a href="/radio/{{ number }}">{{ number }}</a></td>
+	  <td title="{{ radio['last_activity']|full_date }}">Out {{ radio['last_activity']|rel_date }}</td>
+	  <td>{{ radio['checkout']['borrower'] }}</td>
+	  <td>{{ radio['checkout']['department'] }}</td>
+	  <td class="headset-{{ 'yes' if headset else 'no' }}">{{ 'Yes' if headset else 'No' }}</td>
+	  <td/>
+	  <td>
+	    <form action="/checkin" method="post">
+	      <input type="hidden" name="id" value="{{ number }}"/>
+	      <input type="submit" value="Return"/>
+	    </form>
+	  </td>
+	  {% endif %}
+	</tr>
+	{% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
