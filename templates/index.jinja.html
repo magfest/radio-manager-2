@@ -35,6 +35,13 @@
     <h2 class="message">{{ msg }}</h2>
     {% endif %}
 
+    <form action="/newradio" method="post">
+      <div>
+	<input placeholder="Radio ID" type="number" name="id" maxlength="5"/> <input type="submit" value="Add Radio"/>
+      </div>
+    </form>
+    <br/>
+
     <table>
       <thead>
 	<tr>

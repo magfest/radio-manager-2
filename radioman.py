@@ -52,6 +52,15 @@ UBER = None
 class RadioNotFound(Exception):
     pass
 
+class CreateRadioException(Exception):
+    pass
+
+class RadioExists(CreateRadioException):
+    pass
+
+class InvalidID(CreateRadioException):
+    pass
+
 class OverrideException(Exception):
     override = None
 
@@ -131,6 +140,27 @@ def save_db():
     with open(CONFIG['db'], 'w') as f:
         json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG}, f)
 
+def get_blank_radio():
+    return {
+        'status': CHECKED_IN,
+        'last_activity': 0,
+        'history': [{'status': CHECKED_IN,
+                     'department': None,
+                     'borrower': None,
+                     'badge': None,
+                     'headset': None,
+                     'time': 0,
+        }],
+        'checkout': {
+            'status': CHECKED_IN,
+            'department': None,
+            'borrower': None,
+            'badge': None,
+            'headset': None,
+            'time': 0,
+        },
+    }
+
 def configure(f):
     global CONFIG, RADIOS
     with open(f) as conf:
@@ -140,25 +170,7 @@ def configure(f):
 
     for radio in CONFIG.get('radios', []):
         if str(radio) not in RADIOS:
-            RADIOS[radio] = {
-                'status': CHECKED_IN,
-                'last_activity': 0,
-                'history': [{'status': CHECKED_IN,
-                             'department': None,
-                             'borrower': None,
-                             'badge': None,
-                             'headset': None,
-                             'time': 0,
-                }],
-                'checkout': {
-                    'status': CHECKED_IN,
-                    'department': None,
-                    'borrower': None,
-                    'badge': None,
-                    'headset': None,
-                    'time': 0,
-                },
-            }
+            RADIOS[radio] = get_blank_radio()
 
     for name, dept in CONFIG.get('departments', {}).items():
         LIMITS[name] = dept.get('limit', UNLIMITED)
@@ -352,6 +364,33 @@ def checkout():
     except OverrideException as e:
         if e.args:
             return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
+    return flask.redirect('/?ok')
+
+@APP.route('/newradio', methods=['POST'])
+def newradio():
+    args = request.form
+    print(args)
+
+    radio = args.get('id', '')
+
+    if not radio:
+        return flask.redirect('/?err=ID+is+required')
+
+    try:
+        try:
+            assert int(radio) > 0
+        except:
+            raise InvalidID("Invalid radio ID")
+
+        if str(radio) in RADIOS:
+            raise RadioExists("Radio {} already exists".format(radio))
+
+        RADIOS[radio] = get_blank_radio()
+        save_db()
+    except (OverrideException, CreateRadioException) as e:
+        if e.args:
+            return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
+
     return flask.redirect('/?ok')
 
 @APP.route('/')
