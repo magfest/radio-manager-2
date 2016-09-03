@@ -35,6 +35,8 @@
     <h2 class="message">{{ msg }}</h2>
     {% endif %}
 
+    <h3>Radios</h3>
+
     <form action="/newradio" method="post">
       <div>
 	<input placeholder="Radio ID" type="number" name="id" maxlength="5"/> <input type="submit" value="Add Radio"/>
@@ -65,26 +67,25 @@
 	      <input name="name" type="text" placeholder="Name" required="true"/>
 	    </td>
 	    <td>
-	      <input name="department" type="department" placeholder="Department (optional)"/>
+	      <input name="department" required="true" type="text" placeholder="Department"/>
 	    </td>
 	    <td>
 	      <input name="headset" type="checkbox" value="1"/>
 	    </td>
 	    <td>
-	      <form action="/checkout" method="post">
 		<input type="hidden" name="id" value="{{ number }}"/>
 		<input type="submit" name="action" value="Check Out" class="btn-check-out"/>
 	    </td>
 	    <td/>
-	    </form>
+	  </form>
 	</tr>
-	{% else %}
+	{% elif radio['status'] == "CHECKED_OUT" %}
 	{% set headset = radio['checkout'].get('headset', False) %}
 	<tr class="checked-out">
 	  <td><a href="/radio/{{ number }}">{{ number }}</a></td>
 	  <td title="{{ radio['last_activity']|full_date }}">Out {{ radio['last_activity']|rel_date }}</td>
-	  <td>{{ radio['checkout']['borrower'] }}</td>
-	  <td>{{ radio['checkout']['department'] }}</td>
+	  <td>{{ radio['checkout']['borrower']|link('person') }}</td>
+	  <td>{{ radio['checkout']['department']|link('dept') }}</td>
 	  <td class="headset-{{ 'yes' if headset else 'no' }}">{{ 'Yes' if headset else 'No' }}</td>
 	  <td/>
 	  <td>
@@ -93,8 +94,8 @@
 	      <input type="submit" value="Return"/>
 	    </form>
 	  </td>
-	  {% endif %}
 	</tr>
+    {% endif %}
 	{% endfor %}
       </tbody>
     </table>

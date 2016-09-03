@@ -21,17 +21,23 @@ LIMITS = {}
 UNLIMITED = None
 
 TEMPLATE_INDEX = "index.jinja.html"
+TEMPLATE_RADIO = "radio.jinja.html"
+TEMPLATE_PERSON = "person.jinja.html"
+TEMPLATE_DEPT = "dept.jinja.html"
 
 BARCODE_RE = re.compile('^[A-Za-z0-9+=-]{6}$')
 
 CHECKED_IN = 'CHECKED_IN'
 CHECKED_OUT = 'CHECKED_OUT'
+LOCKED = 'LOCKED'
 
 ALLOW_MISSING_HEADSET = 'ALLOW_MISSING_HEADSET'
 ALLOW_EXTRA_HEADSET = 'ALLOW_EXTRA_HEADSET'
 
 ALLOW_DOUBLE_CHECKOUT = 'ALLOW_DOUBLE_CHECKOUT'
 ALLOW_DOUBLE_RETURN = 'ALLOW_DOUBLE_RETURN'
+
+ALLOW_LOCKED_CHECKOUT = 'ALLOW_LOCKED_CHECKOUT'
 
 ALLOW_NEGATIVE_HEADSETS = 'ALLOW_NEGATIVE_HEADSETS'
 
@@ -44,7 +50,13 @@ RADIOS = {}
 AUDIT_LOG = []
 LAST_OPER = None
 
-HEADSETS = 0
+HEADSET_TOTAL = 0
+HEADSETS = []
+HEADSET_HISTORY = []
+
+BATTERY_TOTAL = 0
+BATTERIES = []
+BATTERY_HISTORY = []
 
 UBER = None
 
@@ -78,6 +90,9 @@ class UnexpectedHeadset(OverrideException):
 
 class NotCheckedOut(OverrideException):
     override = ALLOW_DOUBLE_RETURN
+
+class RadioLocked(OverrideException):
+    override = ALLOW_LOCKED_CHECKOUT
 
 class DepartmentOverLimit(OverrideException):
     override = ALLOW_DEPARTMENT_OVERDRAFT
@@ -115,10 +130,27 @@ Returns string representing "time since" e.g.
             return "%d %s ago" % (period, singular if period == 1 else plural)
 
     return default
+
+URLS = {
+    'radio': '/radio/{}',
+    'person': '/person/{}',
+    'dept': '/dept/{}',
+}
+
+
+def link(key, type='radio', title=None):
+    if key:
+        prefix = 'Radio ' if type == 'radio' else ''
+
+        return '<a{title} href="{url}">{prefix}{text}</a>'.format(title='title="{}"'.format(title) if title else '',
+                                                                   url=URLS[type].format(key), prefix=prefix, text=key)
+    else:
+        return key
     
 ENV.filters['fmt_date'] = fmt_date
 ENV.filters['full_date'] = full_date
 ENV.filters['rel_date'] = timesince
+ENV.filters['link'] = link
 
 def load_db():
     data = {}
@@ -130,7 +162,11 @@ def load_db():
 
         RADIOS = data.get('radios', {})
 
-        HEADSETS = data.get('headsets', 0)
+        HEADSETS = data.get('headsets', [])
+        if isinstance(HEADSETS, int):
+            HEADSETS = []
+        BATTERIES = data.get('batteries', [])
+
         AUDIT_LOG = data.get('audits', [])
     except FileNotFoundError:
         with open(radiofile, 'w') as f:
@@ -138,7 +174,7 @@ def load_db():
 
 def save_db():
     with open(CONFIG['db'], 'w') as f:
-        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG}, f)
+        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG, 'batteries': BATTERIES}, f)
 
 def get_blank_radio():
     return {
@@ -210,28 +246,76 @@ def department_total(dept):
         if radio['status'] == CHECKED_OUT and \
            radio['checkout']['department'] == dept:
             radio_count += 1
-            if radio['headset']:
-                headset_count += 1
-    return (radio_count, headset_count)
-        
+    for headset in HEADSETS:
+        if headset['department'] == dept:
+            headset_count += 1
+    return radio_count, headset_count
+
+
+def filter_items(model, **kwargs):
+    if model == "radios":
+        return {id: radio for radio in RADIOS if all((attr in radio['checkout'] and radio['checkout'][attr] == val for attr, val in kwargs.items()))}
+    if model == "headsets":
+        target = HEADSETS
+    elif model == "batteries":
+        target = BATTERIES
+    else:
+        target = []
+    return [item for item in target if all((attr in item and item[attr] == val for attr, val in kwargs.items()))]
+
+
+def filter_radios(**kwargs):
+    return filter_items("radios", **kwargs)
+
+
+def filter_headsets(**kwargs):
+    return filter_items("headsets", **kwargs)
+
+
+def filter_batteries(**kwargs):
+    return filter_items("batteries", **kwargs)
+
+
+def checkout_headset(id, dept, name=None, badge=None, barcode=None, overrides=[ALLOW_NEGATIVE_HEADSETS]):
+    if len(HEADSETS) >= HEADSET_TOTAL and \
+       ALLOW_NEGATIVE_HEADSETS not in overrides:
+        raise HeadsetUnavailable("No headsets left")
+
+    if dept in LIMITS and department_total(dept)[1] >= LIMITS[dept]:
+        raise DepartmentOverLimit("{} has already checked out too many limits".format(dept))
+
+    entry = {
+        "department": dept,
+        "borrower": name,
+        "time": time.time(),
+        "status": CHECKED_OUT,
+        "badge": badge,
+        "radio": id
+    }
+    HEADSETS.append(entry)
+
+    HEADSET_HISTORY.append(entry)
+
+
 def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False, overrides=[]):
-    global HEADSETS
     try:
         radio = RADIOS[id]
+
+        if radio['status'] == LOCKED:
+            raise RadioLocked("Radio is locked")
 
         if radio['status'] == CHECKED_OUT and \
            ALLOW_DOUBLE_CHECKOUT not in overrides:
             raise RadioUnavailable("Already checked out")
-
-        if headset and HEADSETS <= 0 and \
-           ALLOW_NEGATIVE_HEADSETS not in overrides:
-            raise HeadsetUnavailable("No headsets left")
 
         if dept in LIMITS and \
            (LIMITS[dept] != UNLIMITED and
             department_total(dept)[1] >= LIMITS[dept]) and \
             ALLOW_DEPARTMENT_OVERDRAFT not in overrides:
             raise DepartmentOverLimit("Department would exceed checkout limit")
+
+        if headset:
+            checkout_headset(id, dept, name=name, badge=badge, barcode=barcode, overrides=overrides + [ALLOW_NEGATIVE_HEADSETS])
 
         radio['status'] = CHECKED_OUT
         radio['last_activity'] = time.time()
@@ -246,13 +330,11 @@ def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False,
         }
         radio['history'].append(radio['checkout'])
 
-        if headset:
-            HEADSETS -= 1
-
         log(CHECKED_OUT, radio['last_activity'], id, name, badge, dept, headset)
         save_db()
     except IndexError:
         raise RadioNotFound("Radio does not exist")
+
 
 def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[ALLOW_MISSING_HEADSET, ALLOW_EXTRA_HEADSET, ALLOW_WRONG_PERSON]):
     try:
@@ -277,20 +359,16 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
         radio['checkout'] = {
             'status': radio['status'],
             'time': radio['last_activity'],
-            'borrower': name,
-            'department': None,
-            'badge': badge,
+            'borrower': name or radio['checkout']['borrower'],
+            'department': radio['checkout']['department'],
+            'badge': badge or radio['checkout']['badge'],
             'headset': None,
-            'barcode': barcode,
+            'barcode': barcode or radio['checkout']['barcode'],
         }
 
         radio['history'].append(radio['checkout'])
 
         RADIOS[id] = radio
-
-        if headset:
-            global HEADSETS
-            HEADSETS += 1
 
         log(CHECKED_IN, radio['last_activity'], id, '', '', '', headset)
         save_db()
@@ -366,6 +444,15 @@ def checkout():
             return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
     return flask.redirect('/?ok')
 
+def set_locked(radio, locked):
+    pass
+
+@APP.route('/lock', methods=['POST'])
+def lock():
+    args = request.form
+
+    radio = args.get('id', '')
+
 @APP.route('/newradio', methods=['POST'])
 def newradio():
     args = request.form
@@ -393,6 +480,134 @@ def newradio():
 
     return flask.redirect('/?ok')
 
+@APP.route('/radio/<id>')
+def radios(id):
+    if id not in RADIOS:
+        return flask.redirect('/?err=Radio+does+not+exist')
+
+    radio = RADIOS[str(id)]
+
+    template = ENV.get_template(TEMPLATE_RADIO)
+    return template.render(
+        id=id,
+        radio=radio,
+    )
+
+def get_person_history(name):
+    evts = []
+
+    for id, radio in RADIOS.items():
+        for evt in radio['history']:
+            if evt['borrower'] == name:
+                newevt = {'type': 'radio', 'id': id}
+                newevt.update(evt)
+                evts.append(newevt)
+
+    for evt in HEADSET_HISTORY:
+        if evt['borrower'] == name:
+            newevt = {'type': 'headset'}
+            newevt.update(evt)
+            evts.append(newevt)
+
+    for evt in BATTERY_HISTORY:
+        if evt['borrower'] == name:
+            newevt = {'type': 'battery'}
+            newevt.update(evt)
+            evts.append(newevt)
+
+    return evts
+
+def get_dept_history(name):
+    evts = []
+
+    for id, radio in RADIOS.items():
+        for evt in radio['history']:
+            if evt['department'] == name:
+                newevt = {'type': 'radio', 'id': id}
+                newevt.update(evt)
+                evts.append(newevt)
+
+    for evt in HEADSET_HISTORY:
+        if evt['department'] == name:
+            newevt = {'type': 'headset'}
+            newevt.update(evt)
+            evts.append(newevt)
+
+    for evt in BATTERY_HISTORY:
+        if evt['department'] == name:
+            newevt = {'type': 'battery'}
+            newevt.update(evt)
+            evts.append(newevt)
+
+    return evts
+
+
+@APP.route('/person/<name>')
+def person(name):
+    evts = get_person_history(name)
+
+    radios, headsets, batteries = 0, 0, 0
+
+    for evt in evts:
+        if evt['type'] == 'radio':
+            if evt['status'] == CHECKED_IN:
+                radios -= 1
+            elif evt['status'] == CHECKED_OUT:
+                radios += 1
+        elif evt['type'] == 'headset':
+            if evt['status'] == CHECKED_IN:
+                headsets -= 1
+            elif evt['status'] == CHECKED_OUT:
+                radios += 1
+        elif evt['type'] == 'battery':
+            if evt['status'] == CHECKED_IN:
+                batteries -= 1
+            elif evt['status'] == CHECKED_OUT:
+                batteries += 1
+
+    template = ENV.get_template(TEMPLATE_PERSON)
+    return template.render(
+        name=name,
+        history=evts,
+        radios=radios,
+        headsets=headsets,
+        batteries=batteries,
+    )
+
+
+@APP.route('/dept/<name>')
+def dept(name):
+    evts = get_dept_history(name)
+
+    radios, headsets, batteries = 0, 0, 0
+
+    for evt in evts:
+        if evt['type'] == 'radio':
+            if evt['status'] == CHECKED_IN:
+                radios -= 1
+            elif evt['status'] == CHECKED_OUT:
+                radios += 1
+        elif evt['type'] == 'headset':
+            if evt['status'] == CHECKED_IN:
+                headsets -= 1
+            elif evt['status'] == CHECKED_OUT:
+                radios += 1
+        elif evt['type'] == 'battery':
+            if evt['status'] == CHECKED_IN:
+                batteries -= 1
+            elif evt['status'] == CHECKED_OUT:
+                batteries += 1
+
+    template = ENV.get_template(TEMPLATE_DEPT)
+    return template.render(
+        name=name,
+        history=evts,
+        radios=radios,
+        headsets=headsets,
+        batteries=batteries,
+    )
+
+
 @APP.route('/')
 def index():
     args = request.args
@@ -410,7 +625,7 @@ def index():
     return template.render(
         msg=msg, error=err,
         radios=sorted(RADIOS.items(), key=lambda k:int(k[0])),
-        headsets=HEADSETS
+        headsets=HEADSET_TOTAL-len(HEADSETS)
     )
 
 APP.run('0.0.0.0', port=8080, debug=True)

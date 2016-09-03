@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MAGFest Official Radio Checkout System</title>
+    <style type="text/css">
+      .error {
+        color: #ff0000;
+      }
+
+      .message {
+        color: #00ff00;
+      }
+
+      tr.checked-in {
+        background-color: #CAFFD8;
+      }
+
+      tr.checked-out {
+        background-color: #FFBBBB;
+      }
+
+      .headset-yes {
+        background: #E1E1FF;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1> Radio {{ id }} </h1>
+
+	{% if radio['status'] == "CHECKED_IN" %}
+	<h2>Checked In</h2>
+	{% else %}
+	<h2>Checked Out</h2>
+	{% endif %}
+
+    <table>
+      <thead>
+	<tr>
+	  <th>Time</th>
+	  <th>Action</th>
+	  <th>Name / Badge</th>
+	  <th>Department</th>
+	</tr>
+      </thead>
+      <tbody>
+	{% for evt in radio['history']|sort(True, attribute='time') %}
+	{% if evt['status'] == "CHECKED_IN" %}<tr class="checked-in">{% else %}<tr class="checked-out">{% endif %}
+		<td title="{{ evt['time']|full_date }}">{% if evt['time'] %}{{ evt['time']|rel_date }}{% endif %}</td>
+		<td>{% if evt['time'] %}{{ {"CHECKED_IN": 'Checked In', "CHECKED_OUT": 'Checked Out', "LOCKED": "Locked"}[evt['status']] }}{% else %}Created{% endif %}</td>
+	  <td>{{ evt['borrower']|link('person')|default('-', True) }}</td>
+	  <td>{{ evt['department']|link('dept')|default('-', True) }}</td>
+	</tr>
+	{% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
