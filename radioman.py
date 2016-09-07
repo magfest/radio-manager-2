@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python2
 import re
 import json
@@ -276,25 +275,45 @@ def filter_batteries(**kwargs):
     return filter_items("batteries", **kwargs)
 
 
-def checkout_headset(id, dept, name=None, badge=None, barcode=None, overrides=[ALLOW_NEGATIVE_HEADSETS]):
-    if len(HEADSETS) >= HEADSET_TOTAL and \
-       ALLOW_NEGATIVE_HEADSETS not in overrides:
+def checkout_battery(dept, name=None, badge=None, barcode=None, overrides=[]):
+    if len(BATTERIES) >= BATTERY_TOTAL:
         raise HeadsetUnavailable("No headsets left")
 
     if dept in LIMITS and department_total(dept)[1] >= LIMITS[dept]:
-        raise DepartmentOverLimit("{} has already checked out too many limits".format(dept))
+        raise DepartmentOverLimit("{} has already checked out too many batteries".format(dept))
 
     entry = {
         "department": dept,
         "borrower": name,
         "time": time.time(),
         "status": CHECKED_OUT,
-        "badge": badge,
-        "radio": id
+        "badge": badge
+    }
+    BATTERIES.append(entry)
+
+    BATTERY_HISTORY.append(entry)
+    save_db()
+
+
+def checkout_headset(dept, name=None, badge=None, barcode=None, overrides=[ALLOW_NEGATIVE_HEADSETS]):
+    if len(HEADSETS) >= HEADSET_TOTAL and \
+       ALLOW_NEGATIVE_HEADSETS not in overrides:
+        raise HeadsetUnavailable("No headsets left")
+
+    if dept in LIMITS and department_total(dept)[1] >= LIMITS[dept]:
+        raise DepartmentOverLimit("{} has already checked out too many headsets".format(dept))
+
+    entry = {
+        "department": dept,
+        "borrower": name,
+        "time": time.time(),
+        "status": CHECKED_OUT,
+        "badge": badge
     }
     HEADSETS.append(entry)
 
     HEADSET_HISTORY.append(entry)
+    save_db()
 
 
 def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False, overrides=[]):
@@ -315,7 +334,7 @@ def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False,
             raise DepartmentOverLimit("Department would exceed checkout limit")
 
         if headset:
-            checkout_headset(id, dept, name=name, badge=badge, barcode=barcode, overrides=overrides + [ALLOW_NEGATIVE_HEADSETS])
+            checkout_headset(dept, name=name, badge=badge, barcode=barcode, overrides=overrides + [ALLOW_NEGATIVE_HEADSETS])
 
         radio['status'] = CHECKED_OUT
         radio['last_activity'] = time.time()
@@ -335,6 +354,41 @@ def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False,
     except IndexError:
         raise RadioNotFound("Radio does not exist")
 
+def return_battery(barcode=None, name=None, badge=None, dept=None, overrides=[]):
+    global BATTERIES
+
+    for i, headset in enumerate(BATTERIES):
+        if headset['borrower'] == name:
+            del BATTERIES[i]
+            BATTERY_HISTORY.append({
+                'status': CHECKED_IN,
+                'borrower': name,
+                'time': time.time(),
+                'department': dept,
+                'badge': badge,
+                'barcode': barcode,
+            })
+            save_db()
+            return
+    raise HeadsetUnavailable("No battery was found to check in")
+
+def return_headset(barcode=None, name=None, badge=None, dept=None, overrides=[]):
+    global HEADSETS
+
+    for i, headset in enumerate(HEADSETS):
+        if headset['borrower'] == name:
+            del HEADSETS[i]
+            HEADSET_HISTORY.append({
+                'status': CHECKED_IN,
+                'borrower': name,
+                'time': time.time(),
+                'department': dept,
+                'badge': badge,
+                'barcode': barcode,
+            })
+            save_db()
+            return
+    raise HeadsetUnavailable("No headset was found to check in")
 
 def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[ALLOW_MISSING_HEADSET, ALLOW_EXTRA_HEADSET, ALLOW_WRONG_PERSON]):
     try:
@@ -343,12 +397,6 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
         if radio['status'] == CHECKED_IN and \
            ALLOW_DOUBLE_RETURN not in overrides:
             raise NotCheckedOut("Radio was already checked in")
-        elif radio['checkout']['headset'] and not headset and \
-           ALLOW_MISSING_HEADSET not in overrides:
-            raise HeadsetRequired("Radio was checked out with headset")
-        elif headset and not radio['checkout']['headset'] and \
-             ALLOW_EXTRA_HEADSET not in overrides:
-            raise UnexpectedHeadset("Radio was not checked out with headset")
         elif name != radio['checkout']['borrower'] and \
              ALLOW_WRONG_PERSON not in overrides:
             raise WrongPerson("Radio was checked out by '{}'".format(radio['checkout']['borrower']))
@@ -366,12 +414,22 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
             'barcode': barcode or radio['checkout']['barcode'],
         }
 
+        if headset:
+            return_headset(barcode=radio['checkout']['barcode'],
+                           name=radio['checkout']['borrower'],
+                           badge=radio['checkout']['badge'],
+                           dept=radio['checkout']['department'])
+
         radio['history'].append(radio['checkout'])
 
         RADIOS[id] = radio
 
         log(CHECKED_IN, radio['last_activity'], id, '', '', '', headset)
         save_db()
+
+        _, headsets_out, batteries_out = get_totals(get_person_history(name))
+
+        return headsets_out, batteries_out
     except IndexError:
         raise RadioNotFound("Radio does not exist")
 
@@ -406,6 +464,59 @@ def get_person_info():
 
 configure('config.json')
 
+@APP.route('/headsetin', methods=['POST'])
+def headset_in():
+    args = request.form
+
+    if args.get('borrower'):
+        try:
+            return_headset(name=args.get('borrower'), dept=args.get('department'))
+            return flask.redirect(request.args.get('page', '/') + '?ok')
+        except OverrideException as e:
+            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+    else:
+        return flask.redirect('/?err=Name+and+department+are+required')
+
+@APP.route('/headsetout', methods=['POST'])
+def headset_out():
+    args = request.form
+
+    if args.get('borrower') and args.get('department'):
+        try:
+            checkout_headset(name=args.get('borrower'), dept=args.get('department'))
+            return flask.redirect(request.args.get('page', '/') + '?ok')
+        except OverrideException as e:
+            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+    else:
+        return flask.redirect('/?err=Name+and+department+are+required')
+
+@APP.route('/batteryin', methods=['POST'])
+def battery_in():
+    args = request.form
+
+    if args.get('borrower'):
+        try:
+            return_headset(name=args.get('borrower'), dept=args.get('department'))
+            return flask.redirect(request.args.get('page', '/') + '?ok')
+        except OverrideException as e:
+            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+    else:
+        return flask.redirect('/?err=Name+and+department+are+required')
+
+@APP.route('/batteryout', methods=['POST'])
+def battery_out():
+    args = request.form
+
+    if args.get('borrower') and args.get('department'):
+        try:
+            checkout_headset(name=args.get('borrower'), dept=args.get('department'))
+            return flask.redirect(request.args.get('page', '/') + '?ok')
+        except OverrideException as e:
+            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+    else:
+        return flask.redirect('/?err=Name+and+department+are+required')
+
+
 @APP.route('/checkin', methods=['POST'])
 def checkin():
     args = request.form
@@ -413,8 +524,10 @@ def checkin():
     print(args)
     if args.get('id'):
         try:
-            return_radio(args.get('id'), True)
-            return flask.redirect('/?ok')
+            has_headset, has_battery = return_radio(args.get('id'), False)
+            if has_headset or has_battery:
+                return flask.redirect('/?check')
+            return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
             if e.args:
                 return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
@@ -442,7 +555,7 @@ def checkout():
     except OverrideException as e:
         if e.args:
             return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
-    return flask.redirect('/?ok')
+    return flask.redirect(request.args.get('page', '/') + '?ok')
 
 def set_locked(radio, locked):
     pass
@@ -452,6 +565,7 @@ def lock():
     args = request.form
 
     radio = args.get('id', '')
+
 
 @APP.route('/newradio', methods=['POST'])
 def newradio():
@@ -478,7 +592,7 @@ def newradio():
         if e.args:
             return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
 
-    return flask.redirect('/?ok')
+    return flask.redirect(request.args.get('page', '/') + '?ok')
 
 @APP.route('/radio/<id>')
 def radios(id):
@@ -542,10 +656,7 @@ def get_dept_history(name):
     return evts
 
 
-@APP.route('/person/<name>')
-def person(name):
-    evts = get_person_history(name)
-
+def get_totals(evts):
     radios, headsets, batteries = 0, 0, 0
 
     for evt in evts:
@@ -565,6 +676,20 @@ def person(name):
             elif evt['status'] == CHECKED_OUT:
                 batteries += 1
 
+    return radios, headsets, batteries
+
+@APP.route('/person/<name>')
+def person(name):
+    evts = get_person_history(name)
+
+    radios, headsets, batteries = get_totals(evts)
+
+    out_radios = []
+
+    for id, radio in RADIOS.items():
+        if radio['status'] == CHECKED_OUT and radio['checkout']['borrower'] == name:
+            out_radios.append((id, radio['checkout']))
+
     template = ENV.get_template(TEMPLATE_PERSON)
     return template.render(
         name=name,
@@ -572,6 +697,7 @@ def person(name):
         radios=radios,
         headsets=headsets,
         batteries=batteries,
+        out_radios=out_radios,
     )
 
 
@@ -580,6 +706,8 @@ def dept(name):
     evts = get_dept_history(name)
 
     radios, headsets, batteries = 0, 0, 0
+
+    out_radios = {}
 
     for evt in evts:
         if evt['type'] == 'radio':
@@ -614,18 +742,27 @@ def index():
 
     msg = None
     err = None
+    warn = None
 
     if 'ok' in args:
-        msg="Success"
+        msg = "Success"
 
     if 'err' in args:
         err = args['err']
+
+    if 'check' in args:
+        warn = "Success! Please check in user&apos;s remaining accessories."
+
+    print(HEADSETS)
     
     template = ENV.get_template(TEMPLATE_INDEX)
     return template.render(
-        msg=msg, error=err,
+        msg=msg, error=err, warn=warn,
         radios=sorted(RADIOS.items(), key=lambda k:int(k[0])),
-        headsets=HEADSET_TOTAL-len(HEADSETS)
+        headsets=HEADSET_TOTAL-len(HEADSETS),
+        batteries=BATTERY_TOTAL-len(BATTERIES),
+        headsets_out=HEADSETS,
+        batteries_out=BATTERIES,
     )
 
 APP.run('0.0.0.0', port=8080, debug=True)

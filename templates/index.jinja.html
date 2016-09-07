@@ -11,6 +11,10 @@
         color: #00ff00;
       }
 
+      .warn {
+        color: #ff8800;
+      }
+
       tr.checked-in {
         background-color: #CAFFD8;
       }
@@ -27,16 +31,17 @@
 
   <body>
     <h1> Radio Checkout </h1>
-    <h2>Headsets Remaining: {{ headsets }}</h2>
 
     {% if error %}
     <h2 class="error">{{ error }}</h2>
     {% elif msg %}
     <h2 class="message">{{ msg }}</h2>
+	{% elif warn %}
+	<h2 class="warn">{{ warn }}</h2>
     {% endif %}
 
     <h3>Radios</h3>
-
+    
     <form action="/newradio" method="post">
       <div>
 	<input placeholder="Radio ID" type="number" name="id" maxlength="5"/> <input type="submit" value="Add Radio"/>
@@ -61,7 +66,7 @@
 	{% if radio['status'] == "CHECKED_IN" %}
 	<tr class="checked-in">
 	  <form action="/checkout" method="post">
-	    <td><a href="/radio/{{ number }}">{{ number }}</a></td>
+	    <td><a href="/radio/{{ number }}">Radio {{ number }}</a></td>
 	    <td title="{{ radio['last_activity']|full_date }}">In {% if radio['last_activity'] %}{{ radio['last_activity']|rel_date }}{% endif %}</td>
 	    <td>
 	      <input name="name" type="text" placeholder="Name" required="true"/>
@@ -82,7 +87,7 @@
 	{% elif radio['status'] == "CHECKED_OUT" %}
 	{% set headset = radio['checkout'].get('headset', False) %}
 	<tr class="checked-out">
-	  <td><a href="/radio/{{ number }}">{{ number }}</a></td>
+	  <td><a href="/radio/{{ number }}">Radio {{ number }}</a></td>
 	  <td title="{{ radio['last_activity']|full_date }}">Out {{ radio['last_activity']|rel_date }}</td>
 	  <td>{{ radio['checkout']['borrower']|link('person') }}</td>
 	  <td>{{ radio['checkout']['department']|link('dept') }}</td>
@@ -99,5 +104,77 @@
 	{% endfor %}
       </tbody>
     </table>
+
+	<hr/>
+	<h3>Headsets</h3>
+	<table>
+		<thead>
+		<tr>
+			<th>Status</th>
+			<th>Name / Badge</th>
+			<th>Department</th>
+			<th>Check Out</th>
+			<th>Check In</th>
+		</tr>
+		</thead>
+		<tbody>
+		<tr class="checked-in">
+			<form action="/headsetout" method="post">
+				<div>
+					<td>{% if headsets > 0 %}{{ headsets }} Remaining{% else %}{{ -headsets }} Checked Out{% endif %}</td>
+					<td><input type="text" name="borrower" required="required" placeholder="Name"/></td>
+					<td><input type="text" name="department" required="required" placeholder="Department"/></td>
+					<td><input type="submit" value="Check Out"/></td>
+					<td/>
+				</div>
+			</form>
+		</tr>
+		{% for headset in headsets_out %}
+		<tr class="checked-out">
+			<td title="{{ headset['time']|full_date }}">Out {{ headset['time']|rel_date }}</td>
+			<td>{{ headset['borrower']|link('person') }}</td>
+			<td>{{ headset['department']|link('dept') }}</td>
+			<td/>
+			<td><form action="/headsetin" method="post"><div><input type="hidden" name="borrower" value="{{ headset['borrower'] }}"/><input type="hidden" name="department" value="{{ headset['department'] }}"/><input type="submit" value="Check In"/></div></form></td>
+		</tr>
+		{% endfor %}
+		</tbody>
+	</table>
+
+	<hr/>
+	<h3>Batteries</h3>
+	<table>
+		<thead>
+		<tr>
+			<th>Status</th>
+			<th>Name / Badge</th>
+			<th>Department</th>
+			<th>Check Out</th>
+			<th>Check In</th>
+		</tr>
+		</thead>
+		<tbody>
+		<tr class="checked-in">
+			<form action="/headsetout" method="post">
+				<div>
+					<td>{% if batteries > 0 %}{{ batteries }} Remaining{% else %} {{ -batteries }} Checked Out{% endif %}</td>
+					<td><input type="text" name="borrower" required="required" placeholder="Name"/></td>
+					<td><input type="text" name="department" required="required" placeholder="Department"/></td>
+					<td><input type="submit" value="Check Out"/></td>
+					<td/>
+				</div>
+			</form>
+		</tr>
+		{% for battery in batteries_out %}
+		<tr class="checked-out">
+			<td title="{{ battery['time']|full_date }}">Out {{ battery['time']|rel_date }}</td>
+			<td>{{ battery['borrower']|link('person') }}</td>
+			<td>{{ battery['department']|link('dept') }}</td>
+			<td/>
+			<td><form action="/batteryin" method="post"><div><input type="hidden" name="borrower" value="{{ headset['borrower'] }}"/><input type="hidden" name="department" value="{{ headset['department'] }}"/><input type="submit" value="Check In"/></div></form></td>
+		</tr>
+		{% endfor %}
+		</tbody>
+	</table>
   </body>
 </html>
