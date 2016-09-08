@@ -1,0 +1,9 @@
+{% macro deptinput(departments) %}
+<select name="department" required="required">
+<option value="">...</option>
+{% for dept, opts in departments|dictsort %}
+<option value="{{ dept }}">{{ dept }}</option>
+{% endfor %}
+<option value="Override">Other / Override</option>
+</select>
+{% endmacro %}

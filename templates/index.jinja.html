@@ -32,6 +32,8 @@
   <body>
     <h1> Radio Checkout </h1>
 
+    {% import "macros.jinja" as macros %}
+
     {% if error %}
     <h2 class="error">{{ error }}</h2>
     {% elif msg %}
@@ -72,7 +74,7 @@
 	      <input name="name" type="text" placeholder="Name" required="true"/>
 	    </td>
 	    <td>
-	      <input name="department" required="true" type="text" placeholder="Department"/>
+	      {{ macros.deptinput(departments) }}
 	    </td>
 	    <td>
 	      <input name="headset" type="checkbox" value="1"/>
@@ -123,7 +125,7 @@
 				<div>
 					<td>{% if headsets > 0 %}{{ headsets }} Remaining{% else %}{{ -headsets }} Checked Out{% endif %}</td>
 					<td><input type="text" name="borrower" required="required" placeholder="Name"/></td>
-					<td><input type="text" name="department" required="required" placeholder="Department"/></td>
+					<td>{{ macros.deptinput(departments) }}</td>
 					<td><input type="submit" value="Check Out"/></td>
 					<td/>
 				</div>
@@ -155,11 +157,11 @@
 		</thead>
 		<tbody>
 		<tr class="checked-in">
-			<form action="/headsetout" method="post">
+			<form action="/batteryout" method="post">
 				<div>
 					<td>{% if batteries > 0 %}{{ batteries }} Remaining{% else %} {{ -batteries }} Checked Out{% endif %}</td>
 					<td><input type="text" name="borrower" required="required" placeholder="Name"/></td>
-					<td><input type="text" name="department" required="required" placeholder="Department"/></td>
+					<td>{{ macros.deptinput(departments) }}</td>
 					<td><input type="submit" value="Check Out"/></td>
 					<td/>
 				</div>
@@ -171,7 +173,7 @@
 			<td>{{ battery['borrower']|link('person') }}</td>
 			<td>{{ battery['department']|link('dept') }}</td>
 			<td/>
-			<td><form action="/batteryin" method="post"><div><input type="hidden" name="borrower" value="{{ headset['borrower'] }}"/><input type="hidden" name="department" value="{{ headset['department'] }}"/><input type="submit" value="Check In"/></div></form></td>
+			<td><form action="/batteryin" method="post"><div><input type="hidden" name="borrower" value="{{ battery['borrower'] }}"/><input type="hidden" name="department" value="{{ battery['department'] }}"/><input type="submit" value="Check In"/></div></form></td>
 		</tr>
 		{% endfor %}
 		</tbody>

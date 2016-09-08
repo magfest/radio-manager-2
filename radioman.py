@@ -6,7 +6,14 @@ import flask
 import jinja2
 import datetime
 from flask import request
-from rpctools.jsonrpc import ServerProxy
+#from rpctools.jsonrpc import ServerProxy
+
+try:
+    raise FileNotFoundError()
+except NameError:
+    FileNotFoundError = IOError
+except FileNotFoundError:
+    pass
 
 APP = flask.Flask(__name__)
 ENV = jinja2.Environment(loader=jinja2.FileSystemLoader('./templates'))
@@ -166,6 +173,9 @@ def load_db():
             HEADSETS = []
         BATTERIES = data.get('batteries', [])
 
+        HEADSET_HISTORY = data.get('headset_history', [])
+        BATTERY_HISTORY = data.get('battery_history', [])
+
         AUDIT_LOG = data.get('audits', [])
     except FileNotFoundError:
         with open(radiofile, 'w') as f:
@@ -173,7 +183,7 @@ def load_db():
 
 def save_db():
     with open(CONFIG['db'], 'w') as f:
-        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG, 'batteries': BATTERIES}, f)
+        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG, 'batteries': BATTERIES, 'headset_history': HEADSET_HISTORY, 'battery_history': BATTERY_HISTORY}, f)
 
 def get_blank_radio():
     return {
@@ -197,7 +207,7 @@ def get_blank_radio():
     }
 
 def configure(f):
-    global CONFIG, RADIOS
+    global CONFIG, RADIOS, HEADSET_TOTAL, BATTERY_TOTAL
     with open(f) as conf:
         CONFIG.update(json.load(conf))
 
@@ -209,6 +219,9 @@ def configure(f):
 
     for name, dept in CONFIG.get('departments', {}).items():
         LIMITS[name] = dept.get('limit', UNLIMITED)
+
+    HEADSET_TOTAL = CONFIG.get('headsets', 0)
+    BATTERY_TOTAL = CONFIG.get('batteries', 0)
 
     save_db()
 
@@ -241,14 +254,23 @@ def log_audit(*fields):
 def department_total(dept):
     radio_count = 0
     headset_count = 0
+    battery_count = 0
+
     for radio in RADIOS.values():
         if radio['status'] == CHECKED_OUT and \
            radio['checkout']['department'] == dept:
             radio_count += 1
+
     for headset in HEADSETS:
-        if headset['department'] == dept:
+        if headset['status'] == CHECKED_OUT and \
+           headset['department'] == dept:
             headset_count += 1
-    return radio_count, headset_count
+
+    for battery in BATTERIES:
+        if battery['status'] == CHECKED_OUT and \
+           battery['department'] == dept:
+            battery_count += 1
+    return radio_count, headset_count, battery_count
 
 
 def filter_items(model, **kwargs):
@@ -276,10 +298,7 @@ def filter_batteries(**kwargs):
 
 
 def checkout_battery(dept, name=None, badge=None, barcode=None, overrides=[]):
-    if len(BATTERIES) >= BATTERY_TOTAL:
-        raise HeadsetUnavailable("No headsets left")
-
-    if dept in LIMITS and department_total(dept)[1] >= LIMITS[dept]:
+    if dept in LIMITS and LIMITS[dept] != UNLIMITED and department_total(dept)[2] >= LIMITS[dept]:
         raise DepartmentOverLimit("{} has already checked out too many batteries".format(dept))
 
     entry = {
@@ -300,7 +319,7 @@ def checkout_headset(dept, name=None, badge=None, barcode=None, overrides=[ALLOW
        ALLOW_NEGATIVE_HEADSETS not in overrides:
         raise HeadsetUnavailable("No headsets left")
 
-    if dept in LIMITS and department_total(dept)[1] >= LIMITS[dept]:
+    if dept in LIMITS and LIMITS[dept] != UNLIMITED and department_total(dept)[1] >= LIMITS[dept]:
         raise DepartmentOverLimit("{} has already checked out too many headsets".format(dept))
 
     entry = {
@@ -327,11 +346,12 @@ def checkout_radio(id, dept, name=None, badge=None, barcode=None, headset=False,
            ALLOW_DOUBLE_CHECKOUT not in overrides:
             raise RadioUnavailable("Already checked out")
 
+
         if dept in LIMITS and \
            (LIMITS[dept] != UNLIMITED and
-            department_total(dept)[1] >= LIMITS[dept]) and \
+            department_total(dept)[0] >= LIMITS[dept]) and \
             ALLOW_DEPARTMENT_OVERDRAFT not in overrides:
-            raise DepartmentOverLimit("Department would exceed checkout limit")
+            raise DepartmentOverLimit("Department has already received all allocated radios ({})".format(LIMITS[dept]))
 
         if headset:
             checkout_headset(dept, name=name, badge=badge, barcode=barcode, overrides=overrides + [ALLOW_NEGATIVE_HEADSETS])
@@ -496,7 +516,7 @@ def battery_in():
 
     if args.get('borrower'):
         try:
-            return_headset(name=args.get('borrower'), dept=args.get('department'))
+            return_battery(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
             return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
@@ -509,7 +529,7 @@ def battery_out():
 
     if args.get('borrower') and args.get('department'):
         try:
-            checkout_headset(name=args.get('borrower'), dept=args.get('department'))
+            checkout_battery(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
             return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
@@ -521,7 +541,6 @@ def battery_out():
 def checkin():
     args = request.form
 
-    print(args)
     if args.get('id'):
         try:
             has_headset, has_battery = return_radio(args.get('id'), False)
@@ -537,7 +556,6 @@ def checkin():
 @APP.route('/checkout', methods=['POST'])
 def checkout():
     args = request.form
-    print(args)
 
     id = args.get('id', '')
     name = args.get('name', '')
@@ -570,7 +588,6 @@ def lock():
 @APP.route('/newradio', methods=['POST'])
 def newradio():
     args = request.form
-    print(args)
 
     radio = args.get('id', '')
 
@@ -707,7 +724,11 @@ def dept(name):
 
     radios, headsets, batteries = 0, 0, 0
 
-    out_radios = {}
+    out_radios = []
+
+    for id, radio in RADIOS.items():
+        if radio['status'] == CHECKED_OUT and radio['checkout']['department'] == name:
+            out_radios.append((id, radio['checkout']))
 
     for evt in evts:
         if evt['type'] == 'radio':
@@ -733,6 +754,7 @@ def dept(name):
         radios=radios,
         headsets=headsets,
         batteries=batteries,
+        out_radios=out_radios,
     )
 
 
@@ -753,8 +775,6 @@ def index():
     if 'check' in args:
         warn = "Success! Please check in user&apos;s remaining accessories."
 
-    print(HEADSETS)
-    
     template = ENV.get_template(TEMPLATE_INDEX)
     return template.render(
         msg=msg, error=err, warn=warn,
@@ -763,6 +783,7 @@ def index():
         batteries=BATTERY_TOTAL-len(BATTERIES),
         headsets_out=HEADSETS,
         batteries_out=BATTERIES,
+        departments=CONFIG.get("departments", {})
     )
 
 APP.run('0.0.0.0', port=8080, debug=True)

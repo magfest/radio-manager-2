@@ -30,12 +30,12 @@
 
 	{% if headsets > 0 %}
 	<h2>{{ headsets }} headset{{ '' if headsets == 1 else 's' }} checked out:</h2>
-	<form action="/headsetin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="name" value="{{ name }}"/><input type="submit" value="Return Headset"/>></div></form>
+	<form action="/headsetin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="borrower" value="{{ name }}"/><input type="submit" value="Check In Headset"/></div></form>
 	{% endif %}
 
 	{% if batteries > 0 %}
-	<h2>{{ batteries }} batter{{ 'y' if headsets == 1 else 'ies' }} checked out:</h2>
-	<form action="/batteryin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="name" value="{{ name }}"/><input type="submit" value="Return Battery"/>></div></form>
+	<h2>{{ batteries }} batter{{ 'y' if batteries == 1 else 'ies' }} checked out:</h2>
+	<form action="/batteryin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="borrower" value="{{ name }}"/><input type="submit" value="Check In Battery"/></div></form>
 	{% endif %}
 
 	{% if radios > 0 %}
@@ -46,7 +46,7 @@
 		<th>ID</th>
 		<th>Status</th>
 		<th>Department</th>
-		<th>Return</th>
+		<th>Check In</th>
 		<tr/>
 		</thead>
 		<tbody>
@@ -55,7 +55,7 @@
 			<td>{{ id|link('radio') }}</td>
 			<td title="{{ checkout['time']|full_date }}">Out {{ checkout['time']|rel_date }}</td>
 			<td>{{ checkout['department']|link('dept') }}</td>
-			<td><form action="/checkin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="id" value="{{ id }}"/><input type="submit" value="Return"/></div></form></td>
+			<td><form action="/checkin?page=/person/{{ name }}" method="post"><div><input type="hidden" name="id" value="{{ id }}"/><input type="submit" value="Check In"/></div></form></td>
 		</tr>
 		{% endfor %}
 		</tbody>

@@ -31,7 +31,7 @@
 	{% if radio['status'] == "CHECKED_IN" %}
 	<h2>Checked In</h2>
 	{% else %}
-	<h2>Checked Out</h2>
+	<h2>Checked Out to {{ radio['checkout']['borrower']|link('person') }} of {{ radio['checkout']['department']|link('dept') if radio['checkout']['department'] else '' }}</h2>
 	{% endif %}
 
     <table>
