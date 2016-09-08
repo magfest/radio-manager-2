@@ -30,6 +30,7 @@ TEMPLATE_INDEX = "index.jinja.html"
 TEMPLATE_RADIO = "radio.jinja.html"
 TEMPLATE_PERSON = "person.jinja.html"
 TEMPLATE_DEPT = "dept.jinja.html"
+TEMPLATE_PRINTABLE = "print.jinja.html"
 
 BARCODE_RE = re.compile('^[A-Za-z0-9+=-]{6}$')
 
@@ -757,6 +758,17 @@ def dept(name):
         out_radios=out_radios,
     )
 
+@APP.route('/printable')
+def printable():
+    template = ENV.get_template(TEMPLATE_PRINTABLE)
+    return template.render(
+        radios=sorted(RADIOS.items(), key=lambda k:int(k[0])),
+        headsets=HEADSET_TOTAL-len(HEADSETS),
+        batteries=BATTERY_TOTAL-len(BATTERIES),
+        headsets_out=HEADSETS,
+        batteries_out=BATTERIES,
+        departments=CONFIG.get("departments", {})
+    )
 
 @APP.route('/')
 def index():

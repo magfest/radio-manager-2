@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Radio Checkout Log Sheet</title>
+    <style type="text/css">
+      .error {
+        color: #ff0000;
+      }
+
+      .message {
+        color: #00ff00;
+      }
+
+      .warn {
+        color: #ff8800;
+      }
+
+      tr.checked-in {
+        background-color: #CAFFD8;
+      }
+
+      tr.checked-out {
+        background-color: #FFBBBB;
+      }
+
+      .headset-yes {
+        background: #E1E1FF;
+      }
+
+      table, td {
+        border: black 1px solid;
+        border-collapse: collapse;
+      }
+
+      td {
+        height: 1.5em;
+        text-align: center;
+      }
+
+      td:nth-child(1) {
+        text-align: left;
+      }
+
+      h1 {
+        text-align: center;
+      }
+
+      tbody tr:nth-child(2n) {
+        background: #CCC;
+      }
+
+      table {
+        width: 100%;
+        page-break-inside: auto;
+      }
+
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Radio Checkout Log Sheet</h1>
+
+    <table>
+      <thead>
+	<tr>
+	  <th>Type / Radio ID</th>
+	  <th>Time Checked Out</th>
+	  <th>Borrower Name</th>
+	  <th>Department</th>
+	  <th>Time Checked In</th>
+	</tr>
+      </thead>
+      <tbody>
+	{% for number, radio in radios %}
+	{% if radio['status'] == "CHECKED_OUT" %}
+	<tr>
+	  <td>Radio {{ number }}</td>
+	  <td>{{ radio['last_activity']|full_date }}</td>
+	  <td>{{ radio['checkout']['borrower'] }}</td>
+	  <td>{{ radio['checkout']['department'] }}</td>
+	  <td>&nbsp;</td>
+	</tr>
+	{% endif %}
+	{% endfor %}
+
+	{% for headset in headsets_out %}
+	<tr>
+	  <td>Headset</td>
+	  <td>{{ headset['time']|full_date }}</td>
+	  <td>{{ headset['borrower'] }}</td>
+	  <td>{{ headset['department'] }}</td>
+	  <td/>
+	</tr>
+	{% endfor %}
+	
+	{% for battery in batteries_out %}
+	<tr>
+	  <td>Battery</td>
+	  <td>{{ battery['time']|full_date }}</td>
+	  <td>{{ battery['borrower'] }}</td>
+	  <td>{{ battery['department'] }}</td>
+	  <td/>
+	</tr>
+	{% endfor %}
+
+	{% for i in range(25) %}
+	<tr class="manual">
+	  <td>&nbsp;</td><td/><td/><td/><td/>
+	</tr>
+	{% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
