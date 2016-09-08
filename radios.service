@@ -1,0 +1,12 @@
+[Unit]
+Description=Radio checkout script
+
+[Service]
+Type=simple
+ExecStart=/opt/radios/radioman.py
+WorkingDirectory=/opt/radios/
+User=root
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
