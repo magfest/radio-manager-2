@@ -28,10 +28,25 @@
       .headset-yes {
         background: #E1E1FF;
       }
+
+      #navbar {
+        right: 5px;
+        top: 5px;
+        position: fixed;$
+        background-color: gray;
+      }
     </style>
   </head>
 
   <body>
+  <div id="navbar">
+	  Jump to...
+	  <ul>
+		  <li><a href="#radios">Radios</a></li>
+		  <li><a href="#headsets">Headsets</a></li>
+		  <li><a href="#batteries">Batteries</a></li>
+	  </ul>
+  </div>
     <h1> Radio Checkout </h1>
 
     {% import "macros.jinja" as macros %}
@@ -44,14 +59,7 @@
 	<h2 class="warn">{{ warn }}</h2>
     {% endif %}
 
-    <h3>Radios</h3>
-    
-    <form action="/newradio" method="post">
-      <div>
-	<input placeholder="Radio ID" type="number" name="id" maxlength="5"/> <input type="submit" value="Add Radio"/>
-      </div>
-    </form>
-    <br/>
+    <h3 id="radios">Radios</h3>
 
     <table>
       <thead>
@@ -110,7 +118,7 @@
     </table>
 
 	<hr/>
-	<h3>Headsets</h3>
+	<h3 id="headsets">Headsets</h3>
 	<table>
 		<thead>
 		<tr>
@@ -146,7 +154,7 @@
 	</table>
 
 	<hr/>
-	<h3>Batteries</h3>
+	<h3 id="batteries">Batteries</h3>
 	<table>
 		<thead>
 		<tr>
@@ -181,6 +189,13 @@
 		</tbody>
 	</table>
     <hr/>
+    <form action="/newradio" method="post">
+      <div>
+	<input placeholder="Radio ID" type="number" name="id" maxlength="5"/> <input type="submit" value="Add Radio"/>
+      </div>
+    </form>
+    <br/>
+
     <a href="javascript: w=window.open('/printable'); w.print();">Print Offline Version</a> | <a href="/bulkadd">Bulk Add Radios</a>
   </body>
 </html>
