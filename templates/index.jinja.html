@@ -37,7 +37,7 @@
     {% import "macros.jinja" as macros %}
 
     {% if error %}
-    <h2 class="error">Stop! {{ error }}</h2>
+    <h2 class="error">Stop! {{ error }} &mdash; <em>Action Canceled</em></h2>
     {% elif msg %}
     <h2 class="message">{{ msg }}</h2>
 	{% elif warn %}
