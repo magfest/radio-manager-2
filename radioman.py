@@ -145,13 +145,18 @@ URLS = {
     'dept': '/dept/{}',
 }
 
+TRUNC_MAX = 128
+TRUNC_END = 16
+
+def trunc(str):
+    return str if len(str) < TRUNC_MAX else str[:TRUNC_MAX-TRUNC_END] + '...' + str[-TRUNC_END:]
 
 def link(key, type='radio', title=None):
     if key:
         prefix = 'Radio ' if type == 'radio' else ''
 
         return '<a{title} href="{url}">{prefix}{text}</a>'.format(title='title="{}"'.format(title) if title else '',
-                                                                   url=URLS[type].format(key), prefix=prefix, text=key)
+                                                                   url=URLS[type].format(key), prefix=prefix, text=trunc(key))
     else:
         return key
     
