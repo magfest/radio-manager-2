@@ -165,7 +165,7 @@ def load_db():
     try:
         with open(radiofile) as f:
             data = json.load(f)
-        global HEADSETS, AUDIT_LOG, RADIOS
+        global HEADSETS, AUDIT_LOG, RADIOS, HEADSET_HISTORY, BATTERY_HISTORY, BATTERIES
 
         RADIOS = data.get('radios', {})
 
@@ -415,12 +415,16 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
     try:
         radio = RADIOS[id]
 
+        headset_returned = False
+
         if radio['status'] == CHECKED_IN and \
            ALLOW_DOUBLE_RETURN not in overrides:
             raise NotCheckedOut("Radio was already checked in")
         elif name != radio['checkout']['borrower'] and \
              ALLOW_WRONG_PERSON not in overrides:
             raise WrongPerson("Radio was checked out by '{}'".format(radio['checkout']['borrower']))
+
+        name = name or radio['checkout']['borrower']
 
         radio['status'] = CHECKED_IN
         radio['last_activity'] = time.time()
@@ -440,6 +444,7 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
                            name=radio['checkout']['borrower'],
                            badge=radio['checkout']['badge'],
                            dept=radio['checkout']['department'])
+            headset_returned = True
 
         radio['history'].append(radio['checkout'])
 
@@ -450,7 +455,7 @@ def return_radio(id, headset, barcode=None, name=None, badge=None, overrides=[AL
 
         _, headsets_out, batteries_out = get_totals(get_person_history(name))
 
-        return headsets_out, batteries_out
+        return headset_returned, headsets_out, batteries_out
     except IndexError:
         raise RadioNotFound("Radio does not exist")
 
@@ -544,8 +549,8 @@ def checkin():
 
     if args.get('id'):
         try:
-            has_headset, has_battery = return_radio(args.get('id'), False)
-            if has_headset or has_battery:
+            headset_returned, has_headset, has_battery = return_radio(args.get('id'), False)
+            if has_headset or has_battery or headset_returned:
                 return flask.redirect('/?check')
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
@@ -687,7 +692,7 @@ def get_totals(evts):
             if evt['status'] == CHECKED_IN:
                 headsets -= 1
             elif evt['status'] == CHECKED_OUT:
-                radios += 1
+                headsets += 1
         elif evt['type'] == 'battery':
             if evt['status'] == CHECKED_IN:
                 batteries -= 1
