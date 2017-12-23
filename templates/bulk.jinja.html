@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MAGFest Official Radio Checkout System</title>
+    <style type="text/css">
+      .error {
+        color: #ff0000;
+        font-size: 8em;
+      }
+
+      .message {
+        color: #00ff00;
+      }
+
+      .warn {
+        color: #ff8800;
+        font-size: 8em;
+      }
+
+      tr.checked-in {
+        background-color: #CAFFD8;
+      }
+
+      tr.checked-out {
+        background-color: #FFBBBB;
+      }
+
+      .headset-yes {
+        background: #E1E1FF;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1> Bulk Radio Add </h1>
+
+    {% import "macros.jinja" as macros %}
+
+    {% if error %}
+    <h2 class="error">{{ error }}</h2>
+    {% elif msg %}
+    <h2 class="message">{{ msg }}</h2>
+	{% elif warn %}
+	<h2 class="warn">{{ warn }}</h2>
+    {% endif %}
+
+    <h3>Radios</h3>
+    
+    <form action="/bulkadd" method="post">
+      <div>
+	<textarea rows="20" cols="8" name="radios" placeholder="Enter radio IDs separated by whitespace"></textarea>
+	<input type="submit" value="Bulk Add Radios"/>
+      </div>
+    </form>
+  </body>
+</html>

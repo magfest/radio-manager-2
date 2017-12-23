@@ -42,8 +42,6 @@
 	<h2 class="warn">{{ warn }}</h2>
     {% endif %}
 
-    <a href="javascript: w=window.open('/printable'); w.print();">Print Offline Version</a>
-
     <h3>Radios</h3>
     
     <form action="/newradio" method="post">
@@ -180,5 +178,7 @@
 		{% endfor %}
 		</tbody>
 	</table>
+    <hr/>
+    <a href="javascript: w=window.open('/printable'); w.print();">Print Offline Version</a> | <a href="/bulkadd">Bulk Add Radios</a>
   </body>
 </html>

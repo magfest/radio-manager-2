@@ -31,6 +31,7 @@ TEMPLATE_RADIO = "radio.jinja.html"
 TEMPLATE_PERSON = "person.jinja.html"
 TEMPLATE_DEPT = "dept.jinja.html"
 TEMPLATE_PRINTABLE = "print.jinja.html"
+TEMPLATE_BULK_ADD = "bulk.jinja.html"
 
 BARCODE_RE = re.compile('^[A-Za-z0-9+=-]{6}$')
 
@@ -614,6 +615,34 @@ def newradio():
     except (OverrideException, CreateRadioException) as e:
         if e.args:
             return flask.redirect('/?err=' + str(e.args[0]).replace(' ', '+'))
+
+    return flask.redirect(request.args.get('page', '/') + '?ok')
+
+@APP.route('/bulkadd', methods=['GET', 'POST'])
+def bulkadd():
+    if request.method == 'GET':
+        template = ENV.get_template(TEMPLATE_BULK_ADD)
+        return template.render()
+
+    args = request.form
+
+    radios = args.get('radios', '').split()
+
+    try:
+        for radio in radios:
+            try:
+                assert int(radio) > 0
+            except:
+                raise InvalidID("Invalid radio ID")
+
+            if str(radio) in RADIOS:
+                raise RadioExists("Radio {} already exists".format(radio))
+
+            RADIOS[radio] = get_blank_radio()
+        save_db()
+    except (OverrideException, CreateRadioException) as e:
+        if e.args:
+            return flask.redirect('?err=' + str(e.args[0]).replace(' ', '+'))
 
     return flask.redirect(request.args.get('page', '/') + '?ok')
 
