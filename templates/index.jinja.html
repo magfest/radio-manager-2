@@ -35,6 +35,11 @@
         position: fixed;$
         background-color: gray;
       }
+
+      .big-section {
+        float: left;
+        padding: 10px;
+      }
     </style>
   </head>
 
@@ -47,6 +52,7 @@
 		  <li><a href="#batteries">Batteries</a></li>
 	  </ul>
   </div>
+  <div class="big-section">
     <h1> Radio Checkout </h1>
 
     {% import "macros.jinja" as macros %}
@@ -116,7 +122,8 @@
 	{% endfor %}
       </tbody>
     </table>
-
+  </div>
+  <div class="big-section">
 	<hr/>
 	<h3 id="headsets">Headsets</h3>
 	<table>
@@ -152,8 +159,8 @@
 		{% endfor %}
 		</tbody>
 	</table>
+    <hr/>
 
-	<hr/>
 	<h3 id="batteries">Batteries</h3>
 	<table>
 		<thead>
@@ -197,5 +204,6 @@
     <br/>
 
     <a href="javascript: w=window.open('/printable'); w.print();">Print Offline Version</a> | <a href="/bulkadd">Bulk Add Radios</a>
+  </div>
   </body>
 </html>
