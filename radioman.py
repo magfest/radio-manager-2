@@ -6,6 +6,8 @@ import flask
 import jinja2
 import datetime
 from flask import request
+import urllib.parse as urllib
+import html
 #from rpctools.jsonrpc import ServerProxy
 
 try:
@@ -156,7 +158,7 @@ def link(key, type='radio', title=None):
         prefix = 'Radio ' if type == 'radio' else ''
 
         return '<a{title} href="{url}">{prefix}{text}</a>'.format(title='title="{}"'.format(title) if title else '',
-                                                                   url=URLS[type].format(key), prefix=prefix, text=trunc(key))
+                                                                   url=URLS[type].format(urllib.quote(key)), prefix=prefix, text=html.escape(trunc(key)))
     else:
         return key
     
@@ -505,7 +507,7 @@ def headset_in():
             return_headset(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
-            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+            return flask.redirect('/?err=' + str(urllib.quote_plus(e.args[0])))
     else:
         return flask.redirect('/?err=Name+and+department+are+required')
 
@@ -518,7 +520,7 @@ def headset_out():
             checkout_headset(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
-            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+            return flask.redirect('/?err=' + str(urllib.quote_plus(e.args[0])))
     else:
         return flask.redirect('/?err=Name+and+department+are+required')
 
@@ -531,7 +533,7 @@ def battery_in():
             return_battery(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
-            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+            return flask.redirect('/?err=' + str(urllib.quote_plus(e.args[0])))
     else:
         return flask.redirect('/?err=Name+and+department+are+required')
 
@@ -544,7 +546,7 @@ def battery_out():
             checkout_battery(name=args.get('borrower'), dept=args.get('department'))
             return flask.redirect(request.args.get('page', '/') + '?ok')
         except OverrideException as e:
-            return flask.redirect('/?err=' + str(e.args[0].replace(' ', '+')))
+            return flask.redirect('/?err=' + str(urllib.quote_plus(e.args[0])))
     else:
         return flask.redirect('/?err=Name+and+department+are+required')
 
