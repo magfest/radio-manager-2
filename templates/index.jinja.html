@@ -155,8 +155,8 @@
 			<td>{{ headset['department']|link('dept') }}</td>
 			<td/>
 			<td><form action="/headsetin" method="post"><div>
-				<input type="hidden" name="borrower" value="{{ headset['borrower'] | quote }}"/>
-				<input type="hidden" name="department" value="{{ headset['department'] | quote }}"/>
+				<input type="hidden" name="borrower" value="{{ headset['borrower'] | formquote }}"/>
+				<input type="hidden" name="department" value="{{ headset['department'] | formquote }}"/>
 				<input type="submit" value="Check In"/></div></form></td>
 		</tr>
 		{% endfor %}
@@ -194,8 +194,8 @@
 			<td>{{ battery['department']|link('dept') }}</td>
 			<td/>
 			<td><form action="/batteryin" method="post"><div>
-				<input type="hidden" name="borrower" value="{{ battery['borrower'] | quote }}"/>
-				<input type="hidden" name="department" value="{{ battery['department'] | quote }}"/>
+				<input type="hidden" name="borrower" value="{{ battery['borrower'] | formquote }}"/>
+				<input type="hidden" name="department" value="{{ battery['department'] | formquote }}"/>
 				<input type="submit" value="Check In"/></div></form></td>
 		</tr>
 		{% endfor %}

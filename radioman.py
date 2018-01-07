@@ -167,6 +167,7 @@ ENV.filters['full_date'] = full_date
 ENV.filters['rel_date'] = timesince
 ENV.filters['link'] = link
 ENV.filters['quote'] = urllib.quote
+ENV.filters['formquote'] = html.escape
 
 def load_db():
     data = {}
