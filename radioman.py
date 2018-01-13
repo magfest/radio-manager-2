@@ -574,7 +574,7 @@ def checkout():
     args = request.form
 
     id = args.get('id', '')
-    name = args.get('name', '')
+    name = args.get('name', '').replace('/', '')
     dept = args.get('department', '')
     headset = args.get('headset', '')
 
