@@ -175,7 +175,7 @@ def load_db():
     try:
         with open(radiofile) as f:
             data = json.load(f)
-        global HEADSETS, AUDIT_LOG, RADIOS, HEADSET_HISTORY, BATTERY_HISTORY, BATTERIES
+        global HEADSETS, AUDIT_LOG, RADIOS, HEADSET_HISTORY, BATTERY_HISTORY, BATTERIES, PEOPLE
 
         RADIOS = data.get('radios', {})
 
@@ -187,6 +187,8 @@ def load_db():
         HEADSET_HISTORY = data.get('headset_history', [])
         BATTERY_HISTORY = data.get('battery_history', [])
 
+        PEOPLE = data.get('people', {})
+
         AUDIT_LOG = data.get('audits', [])
     except FileNotFoundError:
         with open(radiofile, 'w') as f:
@@ -194,7 +196,7 @@ def load_db():
 
 def save_db():
     with open(CONFIG['db'], 'w') as f:
-        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG, 'batteries': BATTERIES, 'headset_history': HEADSET_HISTORY, 'battery_history': BATTERY_HISTORY}, f)
+        json.dump({'radios': RADIOS, 'headsets': HEADSETS, 'audits': AUDIT_LOG, 'batteries': BATTERIES, 'headset_history': HEADSET_HISTORY, 'battery_history': BATTERY_HISTORY, 'people': PEOPLE}, f)
 
 def get_blank_radio():
     return {
@@ -667,6 +669,40 @@ def radios(id):
         id=id,
         radio=radio,
     )
+
+@APP.route('/radio/<id>.json')
+def radio_json(id):
+    if id not in RADIOS:
+        return flask.jsonify({"error": 404, "message": "Radio does not exist"}), 404
+
+    return flask.jsonify(RADIOS[str(id)])
+
+@APP.route('/radios.json')
+def radios_json():
+    return flask.jsonify(RADIOS)
+
+@APP.route('/people.json')
+def people_json():
+    return flask.jsonify(PEOPLE)
+
+@APP.route('/associate', methods=['POST'])
+def associate():
+    new_id = request.args.get('id', None)
+    new_owner = request.args.get('name', None)
+
+    if not new_id:
+        return flask.jsonify({"error": 400, "message": "'id' parameter must be set"}), 400
+
+    if not new_owner:
+        return flask.jsonify({"error": 400, "message": "'name' parameter must be set"}), 400
+
+    old_owner = PEOPLE.get(str(new_id), None)
+
+    PEOPLE[str(new_id)] = new_owner
+
+    save_db()
+
+    return flask.jsonify({"prev_name": old_owner, "name": new_owner, "id": new_id})
 
 def get_person_history(name):
     evts = []
