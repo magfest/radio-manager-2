@@ -3,7 +3,7 @@ Description=Radio checkout script
 
 [Service]
 Type=simple
-ExecStart=/opt/radios/radioman.py
+ExecStart=/usr/bin/gunicorn --bind 0.0.0.0:80 radioman:APP
 WorkingDirectory=/opt/radios/
 User=root
 Restart=always

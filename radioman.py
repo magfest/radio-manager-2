@@ -877,4 +877,5 @@ def index():
         departments=CONFIG.get("departments", {})
     )
 
-APP.run('0.0.0.0', port=80, debug=True)
+if __name__ == "__main__":
+    APP.run('0.0.0.0', port=80, debug=True)
