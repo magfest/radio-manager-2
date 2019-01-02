@@ -6,8 +6,14 @@ import flask
 import jinja2
 import datetime
 from flask import request
-import urllib.parse as urllib
-import html
+try:
+    import urllib.parse as urllib
+except ImportError:
+    import urllib
+try:
+    import html
+except ImportError:
+    import cgi as html
 #from rpctools.jsonrpc import ServerProxy
 
 try:
